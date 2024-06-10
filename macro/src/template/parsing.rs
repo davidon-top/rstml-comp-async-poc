@@ -11,7 +11,23 @@ use rstml::{
 	ParsingResult,
 };
 use std::collections::HashSet;
-use syn::{spanned::Spanned, Expr, ExprLit, Lit, LitBool, Path};
+use syn::{spanned::Spanned, Block, Expr, ExprLit, Lit, LitBool, Path};
+
+struct AsyncBlock {
+	token_sep: Token![::],
+	token_await: Token![await],
+	stmts: Vec<Stmt>,
+}
+
+impl Parse for AsyncBlock {
+	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+		Ok(Self {
+			token_sep: input.parse()?,
+			token_await: input.parse()?,
+			stmts: Block::parse_within(input)?,
+		})
+	}
+}
 
 enum TagType {
 	Component(Path),
@@ -101,7 +117,7 @@ impl TemplateParser {
 				NodeName::Path(path) => {
 					if path.qself.is_some()
 						|| path.path.leading_colon.is_some()
-						|| path.path.segments.len() > 1
+						|| path.path.segments.len() > 2 // FIXME relaxed condition for async
 						|| path.path.segments[0]
 							.ident
 							.to_string()
@@ -409,6 +425,7 @@ impl TemplateParser {
 	}
 
 	fn visit_block(&mut self, block: NodeBlock) {
+		panic!("Parsing block");
 		self
 			.instructions
 			.push(TemplateWriteInstruction::DynamicContent(block));

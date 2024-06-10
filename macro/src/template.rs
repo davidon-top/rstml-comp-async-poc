@@ -4,6 +4,7 @@ use proc_macro2_diagnostics::Diagnostic;
 use quote::quote;
 use quote::ToTokens;
 use rstml::node::{NodeBlock, NodeComment, NodeName, NodeText, RawText};
+use syn::Token;
 use std::collections::HashSet;
 use std::sync::OnceLock;
 use syn::parse::Parse;
@@ -212,10 +213,18 @@ impl<'a> ToTokens for TemplateInstructionWriter<'a> {
 			}
 
 			TemplateWriteInstruction::Component(Component {
-				path: name,
+				path,
 				props,
 				children,
 			}) => {
+				let mut name = path.clone();
+
+				let is_async = name.segments.last().is_some_and(|s| s.ident.to_string() == String::from("await"));
+				let token_async = if is_async {
+					let _ = name.segments.pop();
+					Some(quote! {async})
+				} else {None};
+
 				let mut props = props
 					.iter()
 					.map(|ComponentProp { name, value }| quote!(#name: #value))
@@ -227,7 +236,7 @@ impl<'a> ToTokens for TemplateInstructionWriter<'a> {
 						Children::Template(template) => {
 							let template = template.with_formatter(formatter);
 							quote! {
-								|#formatter: &mut ::rstml_component::HtmlFormatter| -> ::std::fmt::Result {
+								#token_async |#formatter: &mut ::rstml_component::HtmlFormatter| -> ::std::fmt::Result {
 									#template
 									Ok(())
 								}
@@ -238,7 +247,11 @@ impl<'a> ToTokens for TemplateInstructionWriter<'a> {
 					props.push(quote!(children: #children));
 				}
 
-				tokens.extend(quote!(#formatter.write_content(#name { #(#props),* })?;));
+				if is_async {
+					tokens.extend(quote!(#formatter.write_async_content(#name { #(#props),* }).await?;));
+				} else {
+					tokens.extend(quote!(#formatter.write_content(#name { #(#props),* })?;));
+				}
 			}
 		}
 	}

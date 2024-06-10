@@ -10,12 +10,12 @@ mod fmt;
 mod sanitize;
 
 pub use builtins::For;
-pub use component::HtmlComponent;
+pub use component::{HtmlComponent, HtmlAsyncComponent};
 pub use fmt::{
-	HtmlAttributeFormatter, HtmlAttributeValue, HtmlAttributes, HtmlAttributesFormatter, HtmlContent,
+	HtmlAttributeFormatter, HtmlAttributeValue, HtmlAttributes, HtmlAttributesFormatter, HtmlContent, HtmlAsyncContent,
 	HtmlFormatter, RawText,
 };
-pub use rstml_component_macro::{component, html, write_html, HtmlComponent};
+pub use rstml_component_macro::{component, html, write_html, HtmlComponent, HtmlAsyncComponent};
 
 #[cfg(feature = "sanitize")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sanitize")))]

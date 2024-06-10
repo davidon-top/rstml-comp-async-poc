@@ -5,17 +5,32 @@ mod write;
 
 #[proc_macro]
 pub fn html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	write::html(input.into(), true).into()
+	write::html(input.into(), true, false).into()
+}
+
+#[proc_macro]
+pub fn async_html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	write::html(input.into(), true, true).into()
 }
 
 #[proc_macro]
 pub fn write_html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	write::write_html(input.into()).into()
+	write::write_html(input.into(), false).into()
+}
+
+#[proc_macro]
+pub fn write_async_html(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	write::write_html(input.into(), true).into()
 }
 
 #[proc_macro_derive(HtmlComponent, attributes(html))]
 pub fn derive_html_component(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	component::derive_html_component(input.into()).into()
+	component::derive_html_component(input.into(), false).into()
+}
+
+#[proc_macro_derive(HtmlAsyncComponent, attributes(html))]
+pub fn derive_html_async_component(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	component::derive_html_component(input.into(), true).into()
 }
 
 /// Turns a function into a component function, arguments to the attribute macro are the visibility

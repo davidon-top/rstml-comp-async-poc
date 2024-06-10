@@ -1,5 +1,5 @@
 use bytes::{BufMut, Bytes, BytesMut};
-use std::fmt;
+use std::{fmt, future::Future};
 
 mod escape;
 
@@ -271,6 +271,23 @@ impl<'a> HtmlFormatter<'a> {
 		content.fmt(self)
 	}
 
+	/// Writes HTML content asynchronously to the formatter's buffer.
+	///
+	/// This method appends HTML content to the formatter's buffer. The provided `content` is an
+	/// instance of a type implementing the [HtmlAsyncContent] trait. The content is formatted and written
+	/// to the buffer according to the implementation of the [HtmlAsyncContent] trait.
+	///
+	/// # Arguments
+	///
+	/// - `content`: An instance implementing the [HtmlAsyncContent] trait, representing the HTML content to write.
+	///
+	/// # Returns
+	///
+	/// A [std::fmt::Result] indicating the success or failure of the writing operation.
+	pub async fn write_async_content(&mut self, content: impl HtmlAsyncContent) -> fmt::Result {
+		content.fmt(self).await
+	}
+
 	/// Writes an HTML comment to the formatter's buffer.
 	///
 	/// This method appends an HTML comment to the formatter's buffer. The provided `comment` is escaped
@@ -386,6 +403,74 @@ pub trait HtmlContent: Sized {
 	}
 }
 
+/// A trait representing content that can be formatted into HTML representation.
+///
+/// Types that implement this trait define how they should be formatted as HTML content.
+/// This trait provides methods to write the formatted content to various output formats,
+/// such as a byte buffer or a string.
+#[async_trait::async_trait]
+pub trait HtmlAsyncContent: Sized {
+	/// Formats the content and writes it to the provided [HtmlFormatter].
+	///
+	/// This method defines how the implementing type's content should be formatted as HTML.
+	/// Implementations of this method should use the provided [HtmlFormatter] to write the
+	/// formatted content according to the desired syntax and structure.
+	///
+	/// # Arguments
+	///
+	/// - `formatter`: A mutable reference to the [HtmlFormatter] that handles the output.
+	///
+	/// # Returns
+	///
+	/// A [std::fmt::Result] indicating the success or failure of the formatting operation.
+	async fn fmt(self, formatter: &mut HtmlFormatter) -> fmt::Result;
+
+	/// Writes the formatted content to the provided byte buffer.
+	///
+	/// This method creates an [HtmlFormatter] that writes to the given `buffer` and uses
+	/// the `fmt` method to write the formatted content into the buffer.
+	///
+	/// # Arguments
+	///
+	/// - `buffer`: A mutable reference to the byte buffer where the formatted content will be written.
+	///
+	/// # Returns
+	///
+	/// A [std::fmt::Result] indicating the success or failure of the formatting operation.
+	async fn write_to(self, buffer: &mut BytesMut) -> fmt::Result {
+		let mut formatter = HtmlFormatter::new(buffer);
+		self.fmt(&mut formatter).await
+	}
+
+	/// Converts the formatted content into a [Bytes] buffer.
+	///
+	/// This method writes the formatted content to a byte buffer and returns it as a [Bytes] object.
+	///
+	/// # Returns
+	///
+	/// A [Result] containing the [Bytes] object if successful, or a [std::fmt::Error] if formatting fails.
+	async fn into_bytes(self) -> Result<Bytes, fmt::Error> {
+		let mut buffer = BytesMut::new();
+
+		self.write_to(&mut buffer).await?;
+		Ok(buffer.freeze())
+	}
+
+	/// Converts the formatted content into a [String].
+	///
+	/// This method writes the formatted content to a byte buffer, then attempts to convert it into
+	/// a [String].
+	///
+	/// # Returns
+	///
+	/// A [Result] containing the [String] if successful, or a [std::fmt::Error] if formatting or
+	/// conversion to [String] fails.
+	async fn into_string(self) -> Result<String, fmt::Error> {
+		let bytes = self.into_bytes().await?;
+		String::from_utf8(bytes.to_vec()).map_err(|_| fmt::Error)
+	}
+}
+
 pub trait HtmlAttributes {
 	fn fmt(self, formatter: &mut HtmlAttributesFormatter) -> fmt::Result;
 }
@@ -455,6 +540,17 @@ where
 {
 	fn fmt(self, formatter: &mut HtmlFormatter) -> fmt::Result {
 		self(formatter)
+	}
+}
+
+#[async_trait::async_trait]
+impl<F, Fut> HtmlAsyncContent for F
+where
+	Fut: Future<Output = fmt::Result> + Send,
+	F: FnOnce(&mut HtmlFormatter) -> Fut + Send,
+{
+	async fn fmt(self, formatter: &mut HtmlFormatter) -> fmt::Result {
+		self(formatter).await
 	}
 }
 

@@ -3,7 +3,7 @@ use proc_macro2_diagnostics::SpanDiagnosticExt;
 use quote::quote;
 use syn::{spanned::Spanned, Fields, Item};
 
-pub fn derive_html_component(input: TokenStream) -> TokenStream {
+pub fn derive_html_component(input: TokenStream, is_async: bool) -> TokenStream {
 	let full_span = input.span();
 	let input = match syn::parse2(input) {
 		Ok(Item::Struct(item_struct)) => item_struct,
@@ -25,10 +25,11 @@ pub fn derive_html_component(input: TokenStream) -> TokenStream {
 
 	let ident = &input.ident;
 	let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+	let token_html_component = if is_async {quote!(HtmlAsyncComponent)} else {quote!(HtmlComponent)};
 
 	quote! {
 		#[automatically_derived]
-		impl #impl_generics ::rstml_component::HtmlComponent for #ident #ty_generics #where_clause {
+		impl #impl_generics ::rstml_component::#token_html_component for #ident #ty_generics #where_clause {
 			type Content = Self;
 
 			fn into_content(self) -> Self::Content {
